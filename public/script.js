@@ -13,11 +13,12 @@ function login() {
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
 
-  socket = new WebSocket(`wss://${location.hostname}:8443/?username=${username}&password=${password}`);
+  // Kirim username, password, dan token sebagai query string
+  socket = new WebSocket(`wss://${location.hostname}:8443/?username=${username}&password=${password}&token=token123`);
 
   socket.onopen = () => {
     document.getElementById('chat').style.display = 'block';
-    logMsg("Connected as " + username);
+    logMsg(`Connected to server as ${username}`);
   };
 
   socket.onmessage = (event) => {
@@ -37,46 +38,59 @@ function sendMessage() {
   const to = document.getElementById('recipient').value;
   const text = document.getElementById('message').value;
   if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(JSON.stringify({ to, text }));
+    const from = document.getElementById('username').value; // ambil username yang login
+    socket.send(JSON.stringify({ from, to, text }));
+    document.getElementById('message').value = '';
   }
 }
+
+socket.onmessage = (event) => {
+  const messages = document.getElementById('messages');
+  const div = document.createElement('div');
+
+  try {
+    const data = JSON.parse(event.data);
+    if (data.from && data.text) {
+      div.innerText = `💬 ${data.from}: ${data.text}`;
+    } else {
+      div.innerText = event.data; // fallback untuk pesan biasa
+    }
+  } catch (e) {
+    div.innerText = event.data; // fallback jika bukan JSON
+  }
+
+  messages.appendChild(div);
+  messages.scrollTop = messages.scrollHeight;
+};
 
 // Test WebSocket
 function testWebSocket() {
   const token = 'token123';
-  ws = new WebSocket(`wss://${location.hostname}:8443/?token=${token}`);
+  const testSocket = new WebSocket(`wss://${location.hostname}:8443/?username=user1&password=pass1&token=${token}`);
+  const start = performance.now();
 
-  ws.onopen = () => {
-    const start = performance.now();
-    ws.send('ping');
+  testSocket.onopen = () => {
+    testSocket.send(JSON.stringify({ to: "user2", text: "ping from test" }));
   };
 
-  ws.onmessage = (event) => {
+  testSocket.onmessage = (event) => {
     const end = performance.now();
     logMsg(`[WebSocket] "${event.data}" in ${Math.round(end - start)}ms`);
-    ws.close();
+    testSocket.close();
   };
 
-  ws.onerror = err => logMsg("WebSocket Error: " + err.message);
-  ws.onclose = () => logMsg("WebSocket connection closed.");
-}
-
-// Test gRPC
-function testGrpc() {
-  const start = performance.now();
-  fetch('http://localhost:50051/ping', { method: 'POST' })
-    .then(res => res.json())
-    .then(data => {
-      const end = performance.now();
-      logMsg(`[gRPC] "${data.message}" in ${Math.round(end - start)}ms`);
-    })
-    .catch(err => logMsg("gRPC Error: " + err.message));
+  testSocket.onerror = err => logMsg("WebSocket Error: " + err.message);
+  testSocket.onclose = () => logMsg("WebSocket connection closed.");
 }
 
 // Test REST API
 function testRest() {
   const start = performance.now();
-  fetch('http://localhost:8080/ping')
+
+  fetch('https://localhost:8443/ping', {
+    method: 'GET',
+    headers: { 'Accept': 'text/plain' }
+  })
     .then(res => res.text())
     .then(data => {
       const end = performance.now();
