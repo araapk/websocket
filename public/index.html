@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Protocol Benchmark</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #log {
+      margin-top: 15px;
+      border: 1px solid #ccc;
+      padding: 10px;
+      height: 150px;
+      overflow-y: scroll;
+      background: #f9f9f9;
+    }
+    #chat {
+      margin-top: 30px;
+    }
+    #messages {
+      height: 200px;
+      overflow-y: scroll;
+      border: 1px solid #ccc;
+      padding: 10px;
+      background: #f0f0f0;
+    }
+    input[type="text"] {
+      width: 80%;
+    }
+  </style>
+</head>
+<body>
+  <body>
+  <h2>Login</h2>
+  <input id="username" placeholder="Username">
+  <input id="password" type="password" placeholder="Password">
+  <button onclick="login()">Login</button>
+
+  <div id="chat" style="display:none;">
+    <h3>Chat</h3>
+    <input id="recipient" placeholder="Send to (username)">
+    <input id="message" placeholder="Your message">
+    <button onclick="sendMessage()">Send</button>
+    <div id="messages" style="border:1px solid #ccc; padding:10px; margin-top:10px; height:200px; overflow:auto;"></div>
+  </div>
+
+  <h2>Ping-Pong Benchmark</h2>
+  <button onclick="testWebSocket()">Test WebSocket</button>
+  <button onclick="testRest()">Test REST</button>
+  <!-- Optional: gRPC frontend mockup -->
+  <button onclick="testGrpc()">Test gRPC (Simulated)</button>
+
+  <div id="log"></div>
+
+  <script>
+    const log = (msg) => {
+      const div = document.getElementById('log');
+      div.innerHTML += `<div>${msg}</div>`;
+      div.scrollTop = div.scrollHeight;
+    };
+
+    const messagesDiv = document.getElementById('messages');
+    const token = 'token123'; // Sesuaikan token valid kamu
+    const ws = new WebSocket(`wss://${location.host}?token=${token}`);
+
+    ws.onopen = () => {
+      log('WebSocket connected');
+    };
+
+    ws.onmessage = function(event) {
+      const msg = document.createElement('div');
+      msg.textContent = '📨 ' + event.data;
+      messagesDiv.appendChild(msg);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    };
+
+    function sendMessage() {
+      const input = document.getElementById('input');
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(input.value);
+        input.value = '';
+      } else {
+        log('WebSocket not connected');
+      }
+    }
+
+    function testWebSocket() {
+      const start = performance.now();
+      const tempWs = new WebSocket(`wss://${location.host}?token=${token}`);
+
+      tempWs.onopen = () => {
+        tempWs.send('ping');
+      };
+
+      tempWs.onmessage = (event) => {
+        if (event.data === 'pong') {
+          const end = performance.now();
+          log(`⏱ WebSocket ping-pong: ${(end - start).toFixed(2)} ms`);
+          tempWs.close();
+        }
+      };
+
+      tempWs.onerror = () => {
+        log('WebSocket error');
+      };
+    }
+
+    function testRest() {
+      const start = performance.now();
+      fetch('/ping')
+        .then(res => res.text())
+        .then(data => {
+          if (data === 'pong') {
+            const end = performance.now();
+            log(`REST ping-pong: ${(end - start).toFixed(2)} ms`);
+          } else {
+            log('REST response invalid');
+          }
+        })
+        .catch(() => log('REST error'));
+    }
+
+    function testGrpc() {
+      // Simulasi, karena gRPC-Web tidak tersedia tanpa proxy/envoy/bridge
+      const simulatedTime = Math.random() * 50 + 10;
+      setTimeout(() => {
+        log(`gRPC (simulated) ping-pong: ${simulatedTime.toFixed(2)} ms`);
+      }, simulatedTime);
+    }
+  </script>
+</body>
+</html>
